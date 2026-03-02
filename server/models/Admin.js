@@ -8,6 +8,7 @@ const adminSchema = new mongoose.Schema(
     password: { type: String, required: true, minlength: 6 },
     adminCode: { type: String, required: true, unique: true, trim: true },
     mobile: { type: String, default: "" },
+    companyName: { type: String, default: "" },
     isActive: { type: Boolean, default: true },
     deletedAt: { type: Date, default: null },
     deleteReason: { type: String, default: "" },
