@@ -32,3 +32,4 @@ const SuperAdmin = mongoose.model("SuperAdmin", superAdminSchema);
 export default SuperAdmin;
 
 
+
