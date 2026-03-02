@@ -1,532 +1,339 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiEye, FiEyeOff } from "react-icons/fi";
-import MainLayout from "../components/Dashboard/MainLayout";
-import DashboardModal from "../components/Dashboard/DashboardModal";
-import DashboardCards from "../components/Dashboard/DashboardCards";
-import ClientsTable from "../components/Dashboard/ClientsTable";
-import ReportsSection from "../components/Dashboard/ReportsSection";
-import "../css/dashboard.css";
 import { useAuth } from "../context/AuthContext";
-import {
-  createAdmin,
-  createSuperAdmin,
-  getSuperAdminAdmins,
-  getSuperAdminReports,
-  getSuperAdminStats,
-  softDeleteAdmin,
-  toggleAdminStatus
-} from "../services/dashboardService";
+import MainLayout from "../components/Dashboard/MainLayout";
+import DashboardCards from "../components/Dashboard/DashboardCards";
+import ClientsChart from "../components/Dashboard/ClientsChart";
+import ClientsTable from "../components/Dashboard/ClientsTable";
+import ClientDetailsModal from "../components/Dashboard/ClientDetailsModal";
+import SuperAdminReportsSection from "../components/Dashboard/SuperAdminReportsSection";
+import SuperAdminSettings from "../components/Dashboard/SuperAdminSettings";
+import DashboardModal from "../components/Dashboard/DashboardModal";
+import * as ds from "../services/dashboardService";
+import "../css/dashboard.css";
 
-const sanitizePhone = (value) => value.replace(/\D/g, "").slice(0, 10);
+const MENU = ["Dashboard", "Clients", "Reports", "Settings", "Logout"];
 
-const validateUserForm = ({ name, email, password, mobile }) => {
-  if (!name.trim()) return "Name is required";
-  if (!email.trim() || !/^\S+@\S+\.\S+$/.test(email)) return "Valid email is required";
-  if (!password || password.length < 6) return "Password must be at least 6 characters";
-  if (mobile && mobile.length !== 10) return "Mobile number must be 10 digits";
+const sanitizePhone = (val) => String(val || "").replace(/[^0-9]/g, "");
+
+const validateForm = (f) => {
+  if (!f.name?.trim()) return "Name is required";
+  if (!f.email?.trim()) return "Email is required";
+  if (!/\S+@\S+\.\S+/.test(f.email)) return "Invalid email";
+  if (f.password?.length < 6) return "Password must be at least 6 characters";
   return "";
 };
 
 const SuperAdminDashboard = () => {
-  const [activeItem, setActiveItem] = useState("Dashboard");
-  const [stats, setStats] = useState({
-    totalClients: 0,
-    activeClients: 0,
-    totalMembers: 0,
-    totalRevenue: 0
-  });
-  const [admins, setAdmins] = useState([]);
-  const [reportRows, setReportRows] = useState([]);
-  const [reportDate, setReportDate] = useState("");
-  const [loadingStats, setLoadingStats] = useState(false);
-  const [loadingAdmins, setLoadingAdmins] = useState(false);
-  const [loadingReports, setLoadingReports] = useState(false);
-  const [showCreateAdmin, setShowCreateAdmin] = useState(false);
-  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [creatingAdmin, setCreatingAdmin] = useState(false);
-  const [createAdminError, setCreateAdminError] = useState("");
-  const [showAdminPassword, setShowAdminPassword] = useState(false);
-  const [deleteAdminState, setDeleteAdminState] = useState({
-    show: false,
-    adminId: "",
-    reason: "",
-    error: "",
-    submitting: false
-  });
-  const [showCreateSuperAdmin, setShowCreateSuperAdmin] = useState(false);
-  const [creatingSuperAdmin, setCreatingSuperAdmin] = useState(false);
-  const [createSuperAdminError, setCreateSuperAdminError] = useState("");
-  const [createSuperAdminSuccess, setCreateSuperAdminSuccess] = useState("");
-  const [showSuperAdminPassword, setShowSuperAdminPassword] = useState(false);
-  const [adminForm, setAdminForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    mobile: ""
-  });
-  const [superAdminForm, setSuperAdminForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-    mobile: ""
-  });
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [activeItem, setActiveItem] = useState("Dashboard");
 
-  const menuItems = useMemo(
-    () => ["Dashboard", "Clients", "Reports", "Settings", "Logout"],
-    []
-  );
+  const [stats, setStats] = useState(null);
+  const [clientsByMonth, setClientsByMonth] = useState([]);
+  const [admins, setAdmins] = useState([]);
+  const [adminsLoading, setAdminsLoading] = useState(false);
 
-  const cards = [
-    { label: "Total Clients", value: String(stats.totalClients) },
-    { label: "Active Clients", value: String(stats.activeClients) },
-    { label: "Total Members", value: String(stats.totalMembers) },
-    { label: "Total Revenue", value: `$${Number(stats.totalRevenue || 0).toFixed(2)}` }
-  ];
+  const [showAddAdmin, setShowAddAdmin] = useState(false);
+  const [adminForm, setAdminForm] = useState({ name: "", email: "", password: "", mobile: "" });
+  const [showAdminPw, setShowAdminPw] = useState(false);
+  const [adminFormErr, setAdminFormErr] = useState("");
 
+  const [showAddSuperAdmin, setShowAddSuperAdmin] = useState(false);
+  const [saForm, setSaForm] = useState({ name: "", email: "", password: "", mobile: "" });
+  const [showSaPw, setShowSaPw] = useState(false);
+  const [saFormErr, setSaFormErr] = useState("");
+
+  const [showLogout, setShowLogout] = useState(false);
+  const [viewClientId, setViewClientId] = useState(null);
+  const [showStatusConfirm, setShowStatusConfirm] = useState(false);
+  const [statusConfirmTarget, setStatusConfirmTarget] = useState(null);
+  const [statusConfirmAction, setStatusConfirmAction] = useState(null);
+
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteReason, setDeleteReason] = useState("");
+  const settingsRefreshRef = useRef(null);
+
+  const loadStats = async () => {
+    try {
+      const { data } = await ds.getSuperAdminStats();
+      setStats(data);
+    } catch { /* silent */ }
+  };
+
+  const loadClientsByMonth = async () => {
+    try {
+      const { data } = await ds.getSuperAdminClientsByMonth();
+      setClientsByMonth(data?.months || []);
+    } catch { /* silent */ }
+  };
+
+  const loadAdmins = async () => {
+    setAdminsLoading(true);
+    try {
+      const { data } = await ds.getSuperAdminAdmins();
+      setAdmins(data.admins || data || []);
+    } catch { /* silent */ }
+    setAdminsLoading(false);
+  };
+
+  useEffect(() => { loadStats(); loadClientsByMonth(); }, []);
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoadingStats(true);
-        const { data } = await getSuperAdminStats();
-        setStats(data);
-      } catch (error) {
-        console.error("Failed to load super admin stats", error);
-      } finally {
-        setLoadingStats(false);
-      }
-    };
-
-    fetchStats();
-  }, []);
-
+    if (activeItem === "Dashboard") {
+      loadStats();
+      loadClientsByMonth();
+    }
+  }, [activeItem]);
   useEffect(() => {
-    if (activeItem !== "Clients") return;
-
-    const fetchAdmins = async () => {
-      try {
-        setLoadingAdmins(true);
-        const { data } = await getSuperAdminAdmins();
-        setAdmins(data.admins || []);
-      } catch (error) {
-        console.error("Failed to load admins", error);
-      } finally {
-        setLoadingAdmins(false);
-      }
-    };
-
-    fetchAdmins();
+    if (activeItem === "Clients") loadAdmins();
   }, [activeItem]);
 
-  useEffect(() => {
-    if (activeItem !== "Reports") return;
-
-    const fetchReports = async () => {
-      try {
-        setLoadingReports(true);
-        const { data } = await getSuperAdminReports(reportDate);
-        setReportRows(data.rows || []);
-      } catch (error) {
-        console.error("Failed to load super admin reports", error);
-      } finally {
-        setLoadingReports(false);
-      }
-    };
-
-    fetchReports();
-  }, [activeItem, reportDate]);
-
-  const handleToggleAdminStatus = async (adminId) => {
-    try {
-      await toggleAdminStatus(adminId);
-      const { data } = await getSuperAdminAdmins();
-      setAdmins(data.admins || []);
-      const statsResponse = await getSuperAdminStats();
-      setStats(statsResponse.data);
-    } catch (error) {
-      console.error("Failed to toggle admin status", error);
-    }
+  const handleMenu = (item) => {
+    if (item === "Logout") { setShowLogout(true); return; }
+    setActiveItem(item);
   };
 
-  const handleSoftDeleteAdmin = async (adminId) => {
-    setDeleteAdminState({
-      show: true,
-      adminId,
-      reason: "",
-      error: "",
-      submitting: false
-    });
-  };
-
-  const handleDeleteAdminReasonChange = (e) => {
-    setDeleteAdminState((prev) => ({ ...prev, reason: e.target.value, error: "" }));
-  };
-
-  const handleCancelDeleteAdmin = () => {
-    setDeleteAdminState({
-      show: false,
-      adminId: "",
-      reason: "",
-      error: "",
-      submitting: false
-    });
-  };
-
-  const handleConfirmSoftDeleteAdmin = async (e) => {
-    e.preventDefault();
-
-    if (!deleteAdminState.reason.trim()) {
-      setDeleteAdminState((prev) => ({ ...prev, error: "Deletion reason is required" }));
-      return;
-    }
-
-    try {
-      setDeleteAdminState((prev) => ({ ...prev, submitting: true, error: "" }));
-      await softDeleteAdmin(deleteAdminState.adminId, { reason: deleteAdminState.reason.trim() });
-      const [adminsResponse, statsResponse] = await Promise.all([
-        getSuperAdminAdmins(),
-        getSuperAdminStats()
-      ]);
-      setAdmins(adminsResponse.data.admins || []);
-      setStats(statsResponse.data);
-      handleCancelDeleteAdmin();
-    } catch (error) {
-      setDeleteAdminState((prev) => ({
-        ...prev,
-        submitting: false,
-        error: error.response?.data?.message || "Failed to soft delete admin"
-      }));
-    }
-  };
-
-  const handleAdminFormChange = (e) => {
-    const { name, value } = e.target;
-    setAdminForm((prev) => ({ ...prev, [name]: name === "mobile" ? sanitizePhone(value) : value }));
-    setCreateAdminError("");
-  };
-
-  const handleSuperAdminFormChange = (e) => {
-    const { name, value } = e.target;
-    setSuperAdminForm((prev) => ({ ...prev, [name]: name === "mobile" ? sanitizePhone(value) : value }));
-    setCreateSuperAdminError("");
-  };
+  const confirmLogout = () => { logout(); navigate("/login"); };
 
   const handleCreateAdmin = async (e) => {
     e.preventDefault();
-    setCreateAdminError("");
-    const validationError = validateUserForm(adminForm);
-    if (validationError) {
-      setCreateAdminError(validationError);
-      return;
-    }
-
+    const err = validateForm({ ...adminForm, password: adminForm.password || "x" });
+    if (err && !adminForm.password) { setAdminFormErr("Password is required"); return; }
+    if (err) { setAdminFormErr(err); return; }
     try {
-      setCreatingAdmin(true);
-      await createAdmin(adminForm);
+      await ds.createAdmin(adminForm);
+      setShowAddAdmin(false);
       setAdminForm({ name: "", email: "", password: "", mobile: "" });
-      setShowCreateAdmin(false);
-
-      const [adminsResponse, statsResponse] = await Promise.all([
-        getSuperAdminAdmins(),
-        getSuperAdminStats()
-      ]);
-      setAdmins(adminsResponse.data.admins || []);
-      setStats(statsResponse.data);
-    } catch (error) {
-      setCreateAdminError(error.response?.data?.message || "Failed to create admin");
-    } finally {
-      setCreatingAdmin(false);
+      setAdminFormErr("");
+      loadAdmins();
+      loadStats();
+    } catch (ex) {
+      setAdminFormErr(ex.response?.data?.message || "Failed to create admin");
     }
+  };
+
+  const handleToggleAdmin = (id, row) => {
+    const isActive = row?.isActive !== false;
+    setStatusConfirmTarget(id);
+    setStatusConfirmAction(isActive ? "deactivate" : "activate");
+    setShowStatusConfirm(true);
+  };
+
+  const handleStatusConfirm = async () => {
+    if (!statusConfirmTarget) return;
+    try {
+      await ds.toggleAdminStatus(statusConfirmTarget);
+      setShowStatusConfirm(false);
+      setStatusConfirmTarget(null);
+      setStatusConfirmAction(null);
+      loadAdmins();
+      loadStats();
+    } catch { /* silent */ }
+  };
+
+  const handleStatusCancel = () => {
+    setShowStatusConfirm(false);
+    setStatusConfirmTarget(null);
+    setStatusConfirmAction(null);
+  };
+
+  const openDeleteAdmin = (id) => { setDeleteTarget(id); setDeleteReason(""); };
+  const handleDeleteAdmin = async () => {
+    if (!deleteReason?.trim()) return;
+    try {
+      await ds.softDeleteAdmin(deleteTarget, { reason: deleteReason });
+      setDeleteTarget(null);
+      setDeleteReason("");
+      loadAdmins();
+      loadStats();
+    } catch { /* silent */ }
   };
 
   const handleCreateSuperAdmin = async (e) => {
     e.preventDefault();
-    setCreateSuperAdminError("");
-    setCreateSuperAdminSuccess("");
-    const validationError = validateUserForm(superAdminForm);
-    if (validationError) {
-      setCreateSuperAdminError(validationError);
-      return;
-    }
-
+    const err = validateForm(saForm);
+    if (err) { setSaFormErr(err); return; }
     try {
-      setCreatingSuperAdmin(true);
-      await createSuperAdmin(superAdminForm);
-      setSuperAdminForm({ name: "", email: "", password: "", mobile: "" });
-      setShowCreateSuperAdmin(false);
-      setCreateSuperAdminSuccess("Super Admin account created successfully");
-    } catch (error) {
-      setCreateSuperAdminError(error.response?.data?.message || "Failed to create super admin");
-    } finally {
-      setCreatingSuperAdmin(false);
+      await ds.createSuperAdmin(saForm);
+      setShowAddSuperAdmin(false);
+      setSaForm({ name: "", email: "", password: "", mobile: "" });
+      setSaFormErr("");
+      settingsRefreshRef.current?.();
+    } catch (ex) {
+      setSaFormErr(ex.response?.data?.message || "Failed to create super admin");
     }
   };
 
-  const handleMenuSelect = (item) => {
-    if (item === "Logout") {
-      setShowLogoutConfirm(true);
-      return;
-    }
-    setActiveItem(item);
-  };
-
-  const handleConfirmLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  const cards = stats
+    ? [
+        { label: "Total Clients", value: stats.totalClients ?? 0 },
+        { label: "Active Clients", value: stats.activeClients ?? 0 },
+        { label: "Inactive Clients", value: stats.inactiveClients ?? 0 },
+      ]
+    : [];
 
   const renderContent = () => {
-    if (activeItem === "Dashboard") {
-      if (loadingStats) {
-        return <div className="dashboard-empty">Loading dashboard...</div>;
-      }
-      return <DashboardCards cards={cards} />;
+    switch (activeItem) {
+      case "Dashboard":
+        return (
+          <>
+            <DashboardCards cards={cards} />
+            <div className="sa-panel sa-revenue-chart-panel">
+              <h3 className="sa-panel-title">Clients Added Over Time</h3>
+              <p className="sa-revenue-chart-subtitle">New clients per month</p>
+              <ClientsChart data={clientsByMonth} />
+            </div>
+          </>
+        );
+
+      case "Clients":
+        return (
+          <ClientsTable
+            title="Admin Accounts"
+            addLabel="+ Add Admin"
+            rows={admins}
+            showAddButton
+            onAdd={() => { setShowAddAdmin(true); setAdminFormErr(""); }}
+            onView={(row) => setViewClientId(row._id || row.userId)}
+            onToggleStatus={handleToggleAdmin}
+            onSoftDelete={openDeleteAdmin}
+            loading={adminsLoading}
+          />
+        );
+
+      case "Reports":
+        return <SuperAdminReportsSection />;
+
+      case "Settings":
+        return (
+          <SuperAdminSettings
+            onAddSuperAdmin={() => { setShowAddSuperAdmin(true); setSaFormErr(""); }}
+            onRefresh={(fn) => { settingsRefreshRef.current = fn; }}
+          />
+        );
+
+      default:
+        return null;
     }
-    if (activeItem === "Clients") {
-      return (
-        <ClientsTable
-          title="Admins"
-          addLabel="Add Admin"
-          rows={admins}
-          showAddButton
-          onAdd={() => {
-            setCreateAdminError("");
-            setShowCreateAdmin(true);
-          }}
-          onToggleStatus={handleToggleAdminStatus}
-          onSoftDelete={handleSoftDeleteAdmin}
-          loading={loadingAdmins}
-        />
-      );
-    }
-    if (activeItem === "Reports") {
-      return (
-        <ReportsSection
-          reportRows={reportRows}
-          filterDate={reportDate}
-          onFilterDateChange={setReportDate}
-          loading={loadingReports}
-        />
-      );
-    }
-    if (activeItem === "Settings") {
-      return (
-        <section className="dashboard-section">
-          <div className="dashboard-section-topbar">
-            <button
-              type="button"
-              className="dashboard-button"
-              onClick={() => {
-                setCreateSuperAdminError("");
-                setShowCreateSuperAdmin(true);
-              }}
-            >
-              Add Super Admin
-            </button>
-          </div>
-          {createSuperAdminSuccess ? (
-            <p className="dashboard-success-text">{createSuperAdminSuccess}</p>
-          ) : null}
-          <div className="dashboard-empty">Use this section to manage Super Admin access.</div>
-        </section>
-      );
-    }
-    return null;
   };
 
   return (
     <MainLayout
-      menuItems={menuItems}
+      menuItems={MENU}
       activeItem={activeItem}
-      onMenuSelect={handleMenuSelect}
+      onMenuSelect={handleMenu}
       title={activeItem}
-      brandTitle="Super Admin Dashboard"
+      role={user?.role || "superadmin"}
+      onLogout={() => setShowLogout(true)}
     >
-      <DashboardModal
-        open={activeItem === "Clients" && showCreateAdmin}
-        title="Create Admin"
-        onClose={() => setShowCreateAdmin(false)}
-      >
-          <form className="dashboard-form-grid" onSubmit={handleCreateAdmin}>
-            <input
-              className="dashboard-input"
-              name="name"
-              placeholder="Name"
-              value={adminForm.name}
-              onChange={handleAdminFormChange}
-              required
-            />
-            <input
-              className="dashboard-input"
-              name="email"
-              type="email"
-              placeholder="Email"
-              value={adminForm.email}
-              onChange={handleAdminFormChange}
-              required
-            />
-            <div className="dashboard-password-wrapper">
-              <input
-                className="dashboard-input"
-                name="password"
-                type={showAdminPassword ? "text" : "password"}
-                placeholder="Password"
-                value={adminForm.password}
-                onChange={handleAdminFormChange}
-                required
-              />
-              <button
-                type="button"
-                className="dashboard-password-toggle"
-                onClick={() => setShowAdminPassword((prev) => !prev)}
-                aria-label={showAdminPassword ? "Hide password" : "Show password"}
-              >
-                {showAdminPassword ? <FiEyeOff /> : <FiEye />}
-              </button>
-            </div>
-            <input
-              className="dashboard-input"
-              name="mobile"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              placeholder="Mobile Number"
-              value={adminForm.mobile}
-              onChange={handleAdminFormChange}
-            />
-            {createAdminError ? <p className="dashboard-error-text">{createAdminError}</p> : null}
-            <div className="dashboard-form-actions">
-              <button type="submit" className="dashboard-button" disabled={creatingAdmin}>
-                {creatingAdmin ? "Creating..." : "Create Admin"}
-              </button>
-              <button
-                type="button"
-                className="dashboard-button-secondary"
-                onClick={() => setShowCreateAdmin(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-      </DashboardModal>
-      <DashboardModal
-        open={showLogoutConfirm}
-        title="Confirm Logout"
-        onClose={() => setShowLogoutConfirm(false)}
-      >
-        <div className="dashboard-empty">
-          <p className="dashboard-form-title">Are you sure you want to logout?</p>
-        </div>
-        <div className="dashboard-form-actions">
-          <button type="button" className="dashboard-button" onClick={handleConfirmLogout}>
-            Yes, Logout
-          </button>
-          <button
-            type="button"
-            className="dashboard-button-secondary"
-            onClick={() => setShowLogoutConfirm(false)}
-          >
-            Cancel
-          </button>
-        </div>
-      </DashboardModal>
-      <DashboardModal
-        open={activeItem === "Settings" && showCreateSuperAdmin}
-        title="Create Super Admin"
-        onClose={() => setShowCreateSuperAdmin(false)}
-      >
-          <form className="dashboard-form-grid" onSubmit={handleCreateSuperAdmin}>
-            <input
-              className="dashboard-input"
-              name="name"
-              placeholder="Name"
-              value={superAdminForm.name}
-              onChange={handleSuperAdminFormChange}
-              required
-            />
-            <input
-              className="dashboard-input"
-              name="email"
-              type="email"
-              placeholder="Email"
-              value={superAdminForm.email}
-              onChange={handleSuperAdminFormChange}
-              required
-            />
-            <div className="dashboard-password-wrapper">
-              <input
-                className="dashboard-input"
-                name="password"
-                type={showSuperAdminPassword ? "text" : "password"}
-                placeholder="Password"
-                value={superAdminForm.password}
-                onChange={handleSuperAdminFormChange}
-                required
-              />
-              <button
-                type="button"
-                className="dashboard-password-toggle"
-                onClick={() => setShowSuperAdminPassword((prev) => !prev)}
-                aria-label={showSuperAdminPassword ? "Hide password" : "Show password"}
-              >
-                {showSuperAdminPassword ? <FiEyeOff /> : <FiEye />}
-              </button>
-            </div>
-            <input
-              className="dashboard-input"
-              name="mobile"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              placeholder="Mobile Number"
-              value={superAdminForm.mobile}
-              onChange={handleSuperAdminFormChange}
-            />
-            {createSuperAdminError ? <p className="dashboard-error-text">{createSuperAdminError}</p> : null}
-            <div className="dashboard-form-actions">
-              <button type="submit" className="dashboard-button" disabled={creatingSuperAdmin}>
-                {creatingSuperAdmin ? "Creating..." : "Create Super Admin"}
-              </button>
-              <button
-                type="button"
-                className="dashboard-button-secondary"
-                onClick={() => setShowCreateSuperAdmin(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-      </DashboardModal>
-      {activeItem === "Clients" && deleteAdminState.show ? (
-        <section className="dashboard-section">
-          <h3 className="dashboard-subheading">Delete Admin (Soft Delete)</h3>
-          <form className="dashboard-form-grid" onSubmit={handleConfirmSoftDeleteAdmin}>
-            <textarea
-              className="dashboard-textarea"
-              placeholder="Enter deletion reason"
-              value={deleteAdminState.reason}
-              onChange={handleDeleteAdminReasonChange}
-              required
-            />
-            {deleteAdminState.error ? (
-              <p className="dashboard-error-text">{deleteAdminState.error}</p>
-            ) : null}
-            <div className="dashboard-form-actions">
-              <button type="submit" className="dashboard-button" disabled={deleteAdminState.submitting}>
-                {deleteAdminState.submitting ? "Deleting..." : "Confirm Delete"}
-              </button>
-              <button
-                type="button"
-                className="dashboard-button-secondary"
-                onClick={handleCancelDeleteAdmin}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </section>
-      ) : null}
       {renderContent()}
+
+      <ClientDetailsModal
+        open={Boolean(viewClientId)}
+        adminId={viewClientId}
+        onClose={() => setViewClientId(null)}
+      />
+
+      <DashboardModal open={showAddAdmin} title="Add New Admin" onClose={() => setShowAddAdmin(false)} size="form">
+        <form className="sa-form" onSubmit={handleCreateAdmin}>
+          <div className="sa-form-row">
+            <div className="sa-form-field">
+              <label className="sa-form-label">Name</label>
+              <input className="sa-form-input" value={adminForm.name} onChange={(e) => setAdminForm({ ...adminForm, name: e.target.value })} required />
+            </div>
+            <div className="sa-form-field">
+              <label className="sa-form-label">Email</label>
+              <input className="sa-form-input" type="email" value={adminForm.email} onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })} required />
+            </div>
+          </div>
+          <div className="sa-form-row">
+            <div className="sa-form-field">
+              <label className="sa-form-label">Password</label>
+              <div className="sa-form-pw-wrap">
+                <input className="sa-form-input" type={showAdminPw ? "text" : "password"} value={adminForm.password} onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })} required />
+                <button type="button" className="sa-form-pw-toggle" onClick={() => setShowAdminPw((v) => !v)}>{showAdminPw ? <FiEyeOff /> : <FiEye />}</button>
+              </div>
+            </div>
+            <div className="sa-form-field">
+              <label className="sa-form-label">Mobile</label>
+              <input className="sa-form-input" value={adminForm.mobile} onChange={(e) => setAdminForm({ ...adminForm, mobile: sanitizePhone(e.target.value) })} inputMode="numeric" />
+            </div>
+          </div>
+          {adminFormErr && <p className="sa-form-error">{adminFormErr}</p>}
+          <div className="sa-form-actions">
+            <button type="button" className="sa-btn sa-btn-outline" onClick={() => setShowAddAdmin(false)}>Cancel</button>
+            <button type="submit" className="sa-btn sa-btn-primary">Create Admin</button>
+          </div>
+        </form>
+      </DashboardModal>
+
+      <DashboardModal open={showAddSuperAdmin} title="Add New Super Admin" onClose={() => setShowAddSuperAdmin(false)} size="form">
+        <form className="sa-form" onSubmit={handleCreateSuperAdmin}>
+          <div className="sa-form-row">
+            <div className="sa-form-field">
+              <label className="sa-form-label">Name</label>
+              <input className="sa-form-input" value={saForm.name} onChange={(e) => setSaForm({ ...saForm, name: e.target.value })} required />
+            </div>
+            <div className="sa-form-field">
+              <label className="sa-form-label">Email</label>
+              <input className="sa-form-input" type="email" value={saForm.email} onChange={(e) => setSaForm({ ...saForm, email: e.target.value })} required />
+            </div>
+          </div>
+          <div className="sa-form-row">
+            <div className="sa-form-field">
+              <label className="sa-form-label">Password</label>
+              <div className="sa-form-pw-wrap">
+                <input className="sa-form-input" type={showSaPw ? "text" : "password"} value={saForm.password} onChange={(e) => setSaForm({ ...saForm, password: e.target.value })} required />
+                <button type="button" className="sa-form-pw-toggle" onClick={() => setShowSaPw((v) => !v)}>{showSaPw ? <FiEyeOff /> : <FiEye />}</button>
+              </div>
+            </div>
+            <div className="sa-form-field">
+              <label className="sa-form-label">Mobile</label>
+              <input className="sa-form-input" value={saForm.mobile} onChange={(e) => setSaForm({ ...saForm, mobile: sanitizePhone(e.target.value) })} inputMode="numeric" />
+            </div>
+          </div>
+          {saFormErr && <p className="sa-form-error">{saFormErr}</p>}
+          <div className="sa-form-actions">
+            <button type="button" className="sa-btn sa-btn-outline" onClick={() => setShowAddSuperAdmin(false)}>Cancel</button>
+            <button type="submit" className="sa-btn sa-btn-primary">Create Super Admin</button>
+          </div>
+        </form>
+      </DashboardModal>
+
+      <DashboardModal open={showStatusConfirm} title={statusConfirmAction === "activate" ? "Activate Client" : "Deactivate Client"} onClose={handleStatusCancel}>
+        <p style={{ color: "#64748b", fontSize: 14, marginBottom: 20 }}>
+          {statusConfirmAction === "activate"
+            ? "Are you sure you want to activate this client?"
+            : "Are you sure you want to deactivate this client?"}
+        </p>
+        <div className="sa-form-actions">
+          <button type="button" className="sa-btn sa-btn-outline" onClick={handleStatusCancel}>Cancel</button>
+          <button type="button" className="sa-btn sa-btn-primary" onClick={handleStatusConfirm}>Confirm</button>
+        </div>
+      </DashboardModal>
+
+      <DashboardModal open={deleteTarget !== null} title="Delete Admin" onClose={() => { setDeleteTarget(null); setDeleteReason(""); }}>
+        <div className="sa-form">
+          <p style={{ color: "#64748b", fontSize: 14 }}>This will deactivate the admin account. Please provide a reason.</p>
+          <div className="sa-form-field">
+            <label className="sa-form-label">Reason</label>
+            <textarea className="sa-form-textarea" value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} placeholder="Enter deletion reason..." />
+          </div>
+          <div className="sa-form-actions">
+            <button type="button" className="sa-btn sa-btn-outline" onClick={() => { setDeleteTarget(null); setDeleteReason(""); }}>Cancel</button>
+            <button type="button" className="sa-btn sa-btn-danger" onClick={handleDeleteAdmin} disabled={!deleteReason?.trim()}>Confirm Delete</button>
+          </div>
+        </div>
+      </DashboardModal>
+
+      <DashboardModal open={showLogout} title="Confirm Logout" onClose={() => setShowLogout(false)}>
+        <p style={{ color: "#64748b", fontSize: 14, marginBottom: 16 }}>Are you sure you want to logout?</p>
+        <div className="sa-form-actions">
+          <button type="button" className="sa-btn sa-btn-outline" onClick={() => setShowLogout(false)}>Cancel</button>
+          <button type="button" className="sa-btn sa-btn-danger" onClick={confirmLogout}>Yes, Logout</button>
+        </div>
+      </DashboardModal>
     </MainLayout>
   );
 };

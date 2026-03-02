@@ -1,8 +1,17 @@
 import { useState } from "react";
+import { FiMenu } from "react-icons/fi";
 import Sidebar from "./Sidebar";
 import "../../css/dashboard.css";
 
-const MainLayout = ({ menuItems, activeItem, onMenuSelect, title, brandTitle, children }) => {
+const MainLayout = ({
+  menuItems,
+  activeItem,
+  onMenuSelect,
+  title,
+  role,
+  onLogout,
+  children,
+}) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleMenuSelect = (item) => {
@@ -11,7 +20,7 @@ const MainLayout = ({ menuItems, activeItem, onMenuSelect, title, brandTitle, ch
   };
 
   return (
-    <div className="dashboard-layout">
+    <div className="sa-layout">
       <Sidebar
         menuItems={menuItems}
         activeItem={activeItem}
@@ -19,21 +28,34 @@ const MainLayout = ({ menuItems, activeItem, onMenuSelect, title, brandTitle, ch
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />
-      <main className="dashboard-content">
-        <div className="dashboard-content-header">
-          <button
-            type="button"
-            className="dashboard-mobile-menu-button"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open menu"
-          >
-            Menu
-          </button>
-          <h2 className="dashboard-brand-title">{brandTitle}</h2>
-          <h1 className="dashboard-heading">{title}</h1>
-        </div>
-        {children}
-      </main>
+
+      <div className="sa-main">
+        <header className="sa-topbar">
+          <div className="sa-topbar-left">
+            <button
+              type="button"
+              className="sa-mobile-menu-btn"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open menu"
+            >
+              <FiMenu />
+            </button>
+            <h1 className="sa-topbar-title">{title}</h1>
+          </div>
+          <div className="sa-topbar-right">
+            <span className="sa-role-badge">{role}</span>
+            <button
+              type="button"
+              className="sa-topbar-logout"
+              onClick={onLogout}
+            >
+              Logout
+            </button>
+          </div>
+        </header>
+
+        <div className="sa-page">{children}</div>
+      </div>
     </div>
   );
 };

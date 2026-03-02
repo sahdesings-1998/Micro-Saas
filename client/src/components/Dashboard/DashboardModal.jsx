@@ -1,28 +1,29 @@
+import { FiX } from "react-icons/fi";
 import "../../css/dashboard.css";
 
-const DashboardModal = ({ open, title, onClose, children }) => {
+const DashboardModal = ({ open, title, onClose, children, size }) => {
   if (!open) return null;
 
+  const modalClass = size === "form" ? "sa-modal sa-modal-form" : "sa-modal";
+
   return (
-    <div className="dashboard-modal-overlay" onClick={onClose} aria-hidden="true">
-      <div className="dashboard-modal" onClick={(e) => e.stopPropagation()}>
-        <div className="dashboard-modal-header">
-          <h3 className="dashboard-form-title">{title}</h3>
+    <div className="sa-modal-overlay" aria-hidden="true">
+      <div className={modalClass} onClick={(e) => e.stopPropagation()}>
+        <div className="sa-modal-header">
+          <h3 className="sa-modal-title">{title}</h3>
           <button
             type="button"
-            className="dashboard-button-secondary dashboard-button-sm"
+            className="sa-modal-close"
             onClick={onClose}
-            aria-label="Close modal"
+            aria-label="Close"
           >
-            x
+            <FiX />
           </button>
         </div>
-        <div className="dashboard-modal-body">{children}</div>
+        <div className="sa-modal-body">{children}</div>
       </div>
     </div>
   );
 };
 
 export default DashboardModal;
-
-
