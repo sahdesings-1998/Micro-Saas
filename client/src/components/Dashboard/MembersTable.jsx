@@ -1,14 +1,14 @@
 import { FiEye } from "react-icons/fi";
 import "../../css/dashboard.css";
 
-const ClientsTable = ({
-  title = "Clients",
-  addLabel = "Add",
+const MembersTable = ({
+  title = "Members",
+  addLabel = "+ Add Member",
   rows = [],
   showAddButton = false,
   onAdd,
   onView,
-  onToggleStatus,
+  onEdit,
   onSoftDelete,
   loading = false,
 }) => {
@@ -28,17 +28,18 @@ const ClientsTable = ({
           <thead>
             <tr>
               <th>Name</th>
-              <th>Mobile</th>
-              <th>Status</th>
-              <th>Created</th>
-              <th>Email</th>
+              <th>Member Code</th>
+              <th>Phone</th>
+              <th>Company</th>
+              <th>Member Status</th>
+              <th>Join Date</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan="6" className="sa-table-empty">
+                <td colSpan="7" className="sa-table-empty">
                   Loading...
                 </td>
               </tr>
@@ -46,36 +47,35 @@ const ClientsTable = ({
 
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan="6" className="sa-table-empty">
-                  No records found
+                <td colSpan="7" className="sa-table-empty">
+                  No members found
                 </td>
               </tr>
             )}
 
             {!loading &&
               rows.map((row) => {
-                const rowId =
-                  row._id ||
-                  row.userId ||
-                  row.memberId ||
-                  row.memberCode ||
-                  row.adminCode ||
-                  row.email;
-                const actionId = row._id || row.userId || row.memberId || "";
+                const rowId = String(row._id || row.userId || row.memberCode || row.email || "");
+                const actionId = row._id || row.userId || "";
 
                 return (
                   <tr key={rowId}>
                     <td>{row.name}</td>
-                    <td>{row.mobile || "—"}</td>
+                    <td>{row.memberCode || "—"}</td>
+                    <td>{row.mobile || row.phone || "—"}</td>
+                    <td>{row.companyName || "—"}</td>
                     <td>
                       <span
-                        className={`sa-badge ${row.isActive ? "sa-badge-active" : "sa-badge-inactive"}`}
+                        className={`sa-badge ${
+                          row.isActive ? "sa-badge-active" : "sa-badge-inactive"
+                        }`}
                       >
                         {row.isActive ? "Active" : "Inactive"}
                       </span>
                     </td>
-                    <td>{new Date(row.createdAt).toLocaleDateString()}</td>
-                    <td>{row.email}</td>
+                    <td>
+                      {row.createdAt ? new Date(row.createdAt).toLocaleDateString() : "—"}
+                    </td>
                     <td>
                       <div className="sa-table-actions">
                         {onView && (
@@ -85,7 +85,7 @@ const ClientsTable = ({
                             onClick={() => onView(row)}
                             disabled={!actionId}
                             title="View Details"
-                            aria-label="View client details"
+                            aria-label="View member details"
                           >
                             <FiEye />
                           </button>
@@ -93,10 +93,10 @@ const ClientsTable = ({
                         <button
                           type="button"
                           className="sa-btn sa-btn-outline sa-btn-sm"
-                          onClick={() => onToggleStatus(actionId, row)}
+                          onClick={() => onEdit(actionId)}
                           disabled={!actionId}
                         >
-                          {row.isActive ? "Deactivate" : "Activate"}
+                          Edit
                         </button>
                         <button
                           type="button"
@@ -118,4 +118,4 @@ const ClientsTable = ({
   );
 };
 
-export default ClientsTable;
+export default MembersTable;

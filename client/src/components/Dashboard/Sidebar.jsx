@@ -1,38 +1,89 @@
+import {
+  FiGrid,
+  FiUsers,
+  FiBarChart2,
+  FiSettings,
+  FiUser,
+  FiCreditCard,
+  FiLogOut,
+  FiX,
+  FiPackage,
+  FiFileText,
+} from "react-icons/fi";
 import "../../css/dashboard.css";
+
+const iconMap = {
+  Dashboard: FiGrid,
+  Clients: FiUsers,
+  Members: FiUsers,
+  Reports: FiBarChart2,
+  Settings: FiSettings,
+  Profile: FiUser,
+  Account: FiUser,
+  Payments: FiCreditCard,
+  Subscriptions: FiPackage,
+  Invoices: FiFileText,
+};
 
 const Sidebar = ({ menuItems, activeItem, onMenuSelect, isOpen, onClose }) => {
   return (
     <>
       <div
-        className={`dashboard-sidebar-backdrop ${isOpen ? "dashboard-sidebar-backdrop-show" : ""}`}
+        className={`sa-sidebar-backdrop ${isOpen ? "sa-sidebar-backdrop-show" : ""}`}
         onClick={onClose}
         aria-hidden="true"
       />
-      <aside className={`dashboard-sidebar ${isOpen ? "dashboard-sidebar-open" : ""}`}>
-      <div className="dashboard-sidebar-brand">
-        <h2 className="dashboard-heading">Menu</h2>
-        <button
-          type="button"
-          className="dashboard-sidebar-close"
-          onClick={onClose}
-          aria-label="Close menu"
-        >
-          X
-        </button>
-      </div>
-
-      <nav className="dashboard-menu">
-        {menuItems.map((item) => (
+      <aside className={`sa-sidebar ${isOpen ? "sa-sidebar-open" : ""}`}>
+        <div className="sa-sidebar-header">
+          <div className="sa-sidebar-brand">
+            <div className="sa-sidebar-logo">M</div>
+            <h2 className="sa-sidebar-app-name">Micro SaaS</h2>
+          </div>
           <button
-            key={item}
             type="button"
-            className={`dashboard-menu-item ${activeItem === item ? "active" : ""}`}
-            onClick={() => onMenuSelect(item)}
+            className="sa-sidebar-close"
+            onClick={onClose}
+            aria-label="Close menu"
           >
-            {item}
+            <FiX />
           </button>
-        ))}
-      </nav>
+        </div>
+
+        <nav className="sa-sidebar-nav">
+          {menuItems
+            .filter((item) => item !== "Logout")
+            .map((item) => {
+              const Icon = iconMap[item] || FiGrid;
+              return (
+                <button
+                  key={item}
+                  type="button"
+                  className={`sa-nav-item ${activeItem === item ? "active" : ""}`}
+                  onClick={() => onMenuSelect(item)}
+                >
+                  <span className="sa-nav-icon">
+                    <Icon />
+                  </span>
+                  {item}
+                </button>
+              );
+            })}
+        </nav>
+
+        {menuItems.includes("Logout") && (
+          <div className="sa-sidebar-footer">
+            <button
+              type="button"
+              className="sa-nav-logout"
+              onClick={() => onMenuSelect("Logout")}
+            >
+              <span className="sa-nav-icon">
+                <FiLogOut />
+              </span>
+              Logout
+            </button>
+          </div>
+        )}
       </aside>
     </>
   );

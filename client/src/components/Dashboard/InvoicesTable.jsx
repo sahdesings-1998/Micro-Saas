@@ -1,13 +1,12 @@
-import { FiEye } from "react-icons/fi";
 import "../../css/dashboard.css";
 
-const ClientsTable = ({
-  title = "Clients",
-  addLabel = "Add",
+const InvoicesTable = ({
+  title = "Invoices",
+  addLabel = "+ Create Invoice",
   rows = [],
   showAddButton = false,
   onAdd,
-  onView,
+  onEdit,
   onToggleStatus,
   onSoftDelete,
   loading = false,
@@ -27,18 +26,20 @@ const ClientsTable = ({
         <table className="sa-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Mobile</th>
+              <th>Invoice ID</th>
+              <th>Member Code</th>
+              <th>Member Name</th>
+              <th>Subscription Plan</th>
+              <th>Amount</th>
               <th>Status</th>
-              <th>Created</th>
-              <th>Email</th>
+              <th>Invoice Date</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading && (
               <tr>
-                <td colSpan="6" className="sa-table-empty">
+                <td colSpan="8" className="sa-table-empty">
                   Loading...
                 </td>
               </tr>
@@ -46,58 +47,50 @@ const ClientsTable = ({
 
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan="6" className="sa-table-empty">
-                  No records found
+                <td colSpan="8" className="sa-table-empty">
+                  No invoices found
                 </td>
               </tr>
             )}
 
             {!loading &&
               rows.map((row) => {
-                const rowId =
-                  row._id ||
-                  row.userId ||
-                  row.memberId ||
-                  row.memberCode ||
-                  row.adminCode ||
-                  row.email;
-                const actionId = row._id || row.userId || row.memberId || "";
+                const rowId = String(row._id || row.invoiceNumber || row.memberName || "");
+                const actionId = row._id || "";
 
                 return (
                   <tr key={rowId}>
-                    <td>{row.name}</td>
-                    <td>{row.mobile || "—"}</td>
+                    <td>{row.invoiceNumber || row._id || "—"}</td>
+                    <td>{row.memberCode || row.memberId?.memberCode || "—"}</td>
+                    <td>{row.memberName || row.memberId?.name || "—"}</td>
+                    <td>{row.planName || row.subscriptionPlanId?.planName || "—"}</td>
+                    <td>${row.amount ?? 0}</td>
                     <td>
                       <span
-                        className={`sa-badge ${row.isActive ? "sa-badge-active" : "sa-badge-inactive"}`}
+                        className={`sa-badge sa-badge-invoice-status ${
+                          (row.status || "").toLowerCase() === "paid"
+                            ? "sa-badge-paid"
+                            : "sa-badge-unpaid"
+                        }`}
                       >
-                        {row.isActive ? "Active" : "Inactive"}
+                        {row.status || "Unpaid"}
                       </span>
                     </td>
-                    <td>{new Date(row.createdAt).toLocaleDateString()}</td>
-                    <td>{row.email}</td>
+                    <td>
+                      {row.date ? new Date(row.date).toLocaleDateString() : "—"}
+                    </td>
                     <td>
                       <div className="sa-table-actions">
-                        {onView && (
+                        {(row.status || "").toLowerCase() !== "paid" && onToggleStatus && (
                           <button
                             type="button"
                             className="sa-btn sa-btn-outline sa-btn-sm"
-                            onClick={() => onView(row)}
+                            onClick={() => onToggleStatus(actionId)}
                             disabled={!actionId}
-                            title="View Details"
-                            aria-label="View client details"
                           >
-                            <FiEye />
+                            Mark as Paid
                           </button>
                         )}
-                        <button
-                          type="button"
-                          className="sa-btn sa-btn-outline sa-btn-sm"
-                          onClick={() => onToggleStatus(actionId, row)}
-                          disabled={!actionId}
-                        >
-                          {row.isActive ? "Deactivate" : "Activate"}
-                        </button>
                         <button
                           type="button"
                           className="sa-btn sa-btn-danger sa-btn-sm"
@@ -118,4 +111,4 @@ const ClientsTable = ({
   );
 };
 
-export default ClientsTable;
+export default InvoicesTable;

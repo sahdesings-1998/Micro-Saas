@@ -6,11 +6,10 @@ import MemberDashboard from "./pages/MemberDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./css/app.css";
 
-const App = () => {
+function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
-
       <Route
         path="/superadmin"
         element={
@@ -19,7 +18,6 @@ const App = () => {
           </ProtectedRoute>
         }
       />
-
       <Route
         path="/admin"
         element={
@@ -28,7 +26,6 @@ const App = () => {
           </ProtectedRoute>
         }
       />
-
       <Route
         path="/member"
         element={
@@ -37,10 +34,9 @@ const App = () => {
           </ProtectedRoute>
         }
       />
-
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   );
-};
+}
 
 export default App;

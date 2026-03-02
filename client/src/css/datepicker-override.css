@@ -1,0 +1,37 @@
+/* Air Datepicker overrides for SaaS styling */
+.sa-datepicker-input {
+  cursor: pointer;
+  background-color: var(--sa-white, #fff) !important;
+  width: 100%;
+}
+
+.air-datepicker-global-container {
+  z-index: 1500;
+}
+
+.air-datepicker {
+  --adp-font-family: inherit;
+  --adp-font-size: 14px;
+  --adp-border-radius: var(--sa-radius-xs, 10px);
+  --adp-box-shadow: var(--sa-shadow-lg, 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.air-datepicker-body--cell.-day-.-selected- {
+  background: var(--sa-primary, #2563eb) !important;
+}
+
+.air-datepicker-body--cell.-day-.-selected-.-current- {
+  background: var(--sa-primary, #2563eb) !important;
+}
+
+.air-datepicker-nav {
+  border-bottom: 1px solid var(--sa-border, #e2e8f0);
+}
+
+.air-datepicker-button {
+  color: var(--sa-primary, #2563eb);
+}
+
+.air-datepicker-button:hover {
+  background: var(--sa-primary-light, #eff6ff);
+}
